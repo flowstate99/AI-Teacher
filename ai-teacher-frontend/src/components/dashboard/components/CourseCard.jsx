@@ -6,7 +6,7 @@ const CourseCard = ({ course, onContinue, showProgress = true }) => {
   const progress = course.progress?.totalProgress || 0;
   const isCompleted = progress === 100;
   
-  const handleContinue = () => {
+  const handleContinueCourse = () => {
     if (onContinue) {
       onContinue(course);
     }
@@ -82,7 +82,7 @@ const CourseCard = ({ course, onContinue, showProgress = true }) => {
       )}
       
       <button 
-        onClick={handleContinue}
+        onClick={handleContinueCourse}
         className={`w-full py-3 rounded-xl font-medium transition-all transform group-hover:scale-[1.02] flex items-center justify-center space-x-2 ${
           isCompleted
             ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'

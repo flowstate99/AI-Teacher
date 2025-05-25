@@ -43,7 +43,7 @@ export class AssessmentsService {
         questions: generatedData.questions,
         user: { id: userId },
         answers: [], // Empty array initially
-        analysis: {}
+        analysis: {}, // Empty analysis initially
       });
 
       const savedAssessment = await this.assessmentRepository.save(assessment);
@@ -70,28 +70,36 @@ export class AssessmentsService {
     submitDto: SubmitAssessmentDto,
     userId: number,
   ): Promise<Assessment> {
+    console.log('=== Backend Submit Assessment Debug ===');
+    console.log('User ID:', userId);
+    console.log('Submit DTO:', JSON.stringify(submitDto, null, 2));
+    
     const assessment = await this.assessmentRepository.findOne({
       where: { id: submitDto.assessmentId, user: { id: userId } },
       relations: ['user'],
     });
 
     if (!assessment) {
+      console.error('Assessment not found:', { assessmentId: submitDto.assessmentId, userId });
       throw new NotFoundException('Assessment not found');
     }
 
-    if (assessment.analysis) {
+    if (assessment.analysis && Object.keys(assessment.analysis).length > 0) {
+      console.error('Assessment already submitted:', { assessmentId: submitDto.assessmentId });
       throw new BadRequestException('Assessment already submitted');
     }
 
     try {
       // Process answers and calculate scores
       const processedAnswers = this.processAnswers(assessment.questions, submitDto.answers);
+      console.log('Processed answers:', processedAnswers);
       
       // Generate analysis using Gemini AI
       const analysis = await this.geminiService.analyzeAssessmentResults(
         { questions: assessment.questions },
         processedAnswers,
       );
+      console.log('Generated analysis:', analysis);
 
       // Update assessment with answers and analysis
       assessment.answers = processedAnswers;
@@ -102,12 +110,14 @@ export class AssessmentsService {
       };
 
       const savedAssessment = await this.assessmentRepository.save(assessment);
+      console.log('Assessment saved successfully');
 
       // Update user learning profile based on analysis
       await this.updateUserLearningProfile(userId, analysis);
 
       return savedAssessment;
     } catch (error) {
+      console.error('Error in submitAssessment:', error);
       throw new BadRequestException(`Failed to submit assessment: ${error.message}`);
     }
   }

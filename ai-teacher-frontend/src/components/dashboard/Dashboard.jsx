@@ -127,9 +127,9 @@ const Dashboard = ({ user, token, onLogout }) => {
       <ToastContainer />
       
       {/* Temporary debugger - remove in production */}
-      {process.env.NODE_ENV === 'development' && (
+      {/* {process.env.NODE_ENV === 'development' && (
         <ApiDebugger token={token} />
-      )}
+      )} */}
     </div>
   );
 };

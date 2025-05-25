@@ -47,7 +47,12 @@ class ApiService {
         let errorMessage = 'Request failed';
         
         if (typeof data === 'object' && data !== null) {
-          errorMessage = data.message || data.error || JSON.stringify(data);
+          // Handle array of error messages
+          if (Array.isArray(data.message)) {
+            errorMessage = data.message.join(', ');
+          } else {
+            errorMessage = data.message || data.error || JSON.stringify(data);
+          }
         } else if (typeof data === 'string') {
           errorMessage = data;
         }
@@ -89,124 +94,146 @@ class ApiService {
     });
   }
 
-  async getProfile(token) {
-    return this.request('/auth/profile', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  }
-
-  // User endpoints
-  async getUserStats(token) {
-    return this.request('/users/me/stats', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  }
-
-  async getUserProgress(token) {
-    return this.request('/users/me/progress', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  }
-
-  async updateUserPreferences(preferences, token) {
-    return this.request('/users/me/preferences', {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}` },
-      body: preferences,
-    });
-  }
-
   // Assessment endpoints
-  async generateAssessment(subject, token, options = {}) {
-    console.log('=== Assessment API Service Debug ===');
-    console.log('Input subject:', subject);
-    console.log('Input type:', typeof subject);
-    console.log('Token present:', !!token);
+async generateAssessment(subject, token, options = {}) {
+  if (!subject || typeof subject !== 'string' || subject.trim() === '') {
+    throw new Error('Subject is required and must be a non-empty string');
+  }
+  
+  if (!token) {
+    throw new Error('Authentication token is required');
+  }
+
+  // Create a proper DTO object matching the backend's GenerateAssessmentDto
+  const payload = { 
+    subject: subject.trim(),
+    difficulty: options.difficulty || 'medium',
+    questionCount: options.questionCount || 15,
+    focusArea: options.focusArea || undefined,
+    assessmentType: options.assessmentType || 'diagnostic'
+  };
+
+  console.log('Sending assessment generation request:', payload);
+
+  return this.request('/assessments/generate', {
+    method: 'POST',
+    headers: { 
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: payload,
+  });
+}
+
+async generatePersonalizedCourse(subject, token, options = {}) {
+  if (!subject || typeof subject !== 'string' || subject.trim() === '') {
+    throw new Error('Subject is required and must be a non-empty string');
+  }
+  
+  if (!token) {
+    throw new Error('Authentication token is required');
+  }
+
+  // Create a proper DTO object matching the backend's GeneratePersonalizedCourseDto
+  const payload = { 
+    subject: subject.trim(),
+    difficulty: options.difficulty || undefined,
+    focusArea: options.focusArea || undefined,
+    learningObjective: options.learningObjective || undefined
+  };
+
+  console.log('Sending personalized course generation request:', payload);
+
+  return this.request('/courses/personalized', {
+    method: 'POST',
+    headers: { 
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: payload,
+  });
+}
+
+async updateCourseProgress(courseId, progressData, token) {
+  if (!courseId) {
+    throw new Error('Course ID is required');
+  }
+  
+  if (!token) {
+    throw new Error('Authentication token is required');
+  }
+
+  return this.request(`/courses/${courseId}/progress`, {
+    method: 'PATCH',
+    headers: { 
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: progressData,
+  });
+}
+
+  async submitAssessment(assessmentData, token) {
+    console.log('=== Submit Assessment API Debug ===');
+    console.log('Raw assessment data:', assessmentData);
     
-    // Validate required parameters
-    if (!subject || typeof subject !== 'string' || subject.trim() === '') {
-      console.error('Subject validation failed in assessment API service');
-      throw new Error('Subject is required and must be a non-empty string');
+    // Validate required fields
+    if (!assessmentData.assessmentId) {
+      throw new Error('Assessment ID is required');
+    }
+    
+    if (!assessmentData.answers || !Array.isArray(assessmentData.answers)) {
+      throw new Error('Answers must be provided as an array');
     }
     
     if (!token) {
-      console.error('Token validation failed in assessment API service');
       throw new Error('Authentication token is required');
     }
 
-    const cleanSubject = subject.trim();
-    
-    // Create a minimal payload that matches the backend DTO exactly
-    const payload = { 
-      subject: cleanSubject
+    // Convert to numbers and validate
+    const assessmentId = Number(assessmentData.assessmentId);
+    if (isNaN(assessmentId) || assessmentId <= 0) {
+      throw new Error('Assessment ID must be a positive number');
+    }
+
+    // Format the payload properly
+    const payload = {
+      assessmentId: assessmentId,
+      answers: assessmentData.answers.map(answer => ({
+        selectedAnswer: Number(answer.selectedAnswer),
+        timeSpent: Number(answer.timeSpent || 30000),
+        confidence: String(answer.confidence || 'medium')
+      })),
+      totalTimeSpent: Number(assessmentData.totalTimeSpent || 0)
     };
-    
-    // Only add optional fields if they have values
-    if (options.difficulty && options.difficulty.trim()) {
-      payload.difficulty = options.difficulty.trim();
-    }
-    
-    if (options.questionCount && typeof options.questionCount === 'number') {
-      payload.questionCount = options.questionCount;
-    }
-    
-    if (options.focusArea && options.focusArea.trim()) {
-      payload.focusArea = options.focusArea.trim();
-    }
-    
-    if (options.assessmentType && options.assessmentType.trim()) {
-      payload.assessmentType = options.assessmentType.trim();
+
+    // Validate payload
+    if (payload.answers.some(answer => isNaN(answer.selectedAnswer))) {
+      throw new Error('All selected answers must be valid numbers');
     }
 
-    console.log('Final assessment payload to be sent:', JSON.stringify(payload, null, 2));
+    console.log('Formatted payload:', JSON.stringify(payload, null, 2));
 
-    try {
-      const result = await this.request('/assessments/generate', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: payload,
-      });
-      console.log('Assessment API call successful:', result);
-      return result;
-    } catch (error) {
-      console.error('Assessment API call failed with error:', error);
-      throw error;
-    }
-  }
-
-  async submitAssessment(assessmentData, token) {
     return this.request('/assessments/submit', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: assessmentData,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: payload,
     });
   }
 
-  async getAssessments(token) {
-    return this.request('/assessments', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  }
-
-  async getAssessmentResults(assessmentId, token) {
-    return this.request(`/assessments/${assessmentId}/results`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  }
-
-  async getAssessmentStats(token) {
-    return this.request('/assessments/stats', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  }
-
-  async retakeAssessment(assessmentId, token) {
-    return this.request(`/assessments/${assessmentId}/retake`, {
+  // Debug method
+  async debugSubmitAssessment(assessmentData, token) {
+    console.log('=== Debug Submit Test ===');
+    return this.request('/assessments/debug-submit', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: assessmentData,
     });
   }
 
@@ -217,97 +244,56 @@ class ApiService {
     });
   }
 
-  async getCourse(courseId, token) {
-    return this.request(`/courses/${courseId}`, {
+  async generatePersonalizedCourse(subject, token, options = {}) {
+  if (!subject || typeof subject !== 'string' || subject.trim() === '') {
+    throw new Error('Subject is required and must be a non-empty string');
+  }
+  
+  if (!token) {
+    throw new Error('Authentication token is required');
+  }
+
+  // Create a proper DTO object matching the backend's GeneratePersonalizedCourseDto
+  const payload = { 
+    subject: subject.trim(),
+    difficulty: options.difficulty || undefined,
+    focusArea: options.focusArea || undefined,
+    learningObjective: options.learningObjective || undefined
+  };
+
+  console.log('Sending personalized course generation request:', payload);
+
+  return this.request('/courses/personalized', {
+    method: 'POST',
+    headers: { 
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: payload,
+  });
+}
+
+  // User endpoints
+  async getUserStats(token) {
+    return this.request('/users/me/stats', {
       headers: { Authorization: `Bearer ${token}` },
     });
   }
 
-  async generatePersonalizedCourse(subject, token, options = {}) {
-    console.log('=== API Service Debug ===');
-    console.log('Input subject:', subject);
-    console.log('Input type:', typeof subject);
-    console.log('Token present:', !!token);
-    
-    // Validate required parameters
-    if (!subject || typeof subject !== 'string' || subject.trim() === '') {
-      console.error('Subject validation failed in API service');
-      throw new Error('Subject is required and must be a non-empty string');
-    }
-    
-    if (!token) {
-      console.error('Token validation failed in API service');
-      throw new Error('Authentication token is required');
-    }
-
-    const cleanSubject = subject.trim();
-    
-    // Create a minimal payload that matches the backend DTO exactly
-    const payload = { 
-      subject: cleanSubject
-    };
-    
-    // Only add optional fields if they have values
-    if (options.difficulty && options.difficulty.trim()) {
-      payload.difficulty = options.difficulty.trim();
-    }
-    
-    if (options.focusArea && options.focusArea.trim()) {
-      payload.focusArea = options.focusArea.trim();
-    }
-    
-    if (options.learningObjective && options.learningObjective.trim()) {
-      payload.learningObjective = options.learningObjective.trim();
-    }
-
-    console.log('Final payload to be sent:', JSON.stringify(payload, null, 2));
-
-    try {
-      const result = await this.request('/courses/personalized', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: payload,
-      });
-      console.log('API call successful:', result);
-      return result;
-    } catch (error) {
-      console.error('API call failed with error:', error);
-      throw error;
-    }
+  async getAssessmentStats(token) {
+    return this.request('/assessments/stats', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
   }
 
-  async updateCourseProgress(courseId, progressData, token) {
-    return this.request(`/courses/${courseId}/progress`, {
-      method: 'PATCH',
+  async getAssessments(token) {
+    return this.request('/assessments', {
       headers: { Authorization: `Bearer ${token}` },
-      body: progressData,
     });
   }
 
   async getCourseStats(token) {
     return this.request('/courses/stats', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  }
-
-  async getRecommendedCourses(token) {
-    return this.request('/courses/recommended', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  }
-
-  async searchCourses(query, token) {
-    return this.request(`/courses/search?q=${encodeURIComponent(query)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  }
-
-  async duplicateCourse(courseId, token) {
-    return this.request(`/courses/${courseId}/duplicate`, {
-      method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
   }

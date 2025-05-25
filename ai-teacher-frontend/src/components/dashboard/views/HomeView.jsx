@@ -1,5 +1,5 @@
 // src/components/dashboard/views/HomeView.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   BookOpen, 
   Trophy, 
@@ -10,14 +10,259 @@ import {
   Play,
   Clock,
   Award,
-  TrendingUp
+  TrendingUp,
+  X,
+  ChevronLeft,
+  ChevronRight as ChevronRightIcon,
+  CheckCircle
 } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import CourseCard from '../components/CourseCard';
 import QuickActionCard from '../components/QuickActionCard';
+import apiService from '../../../services/api';
 
-const HomeView = ({ user, userData, setCurrentView, loading }) => {
+const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData, showError, showSuccess }) => {
   const { courses, userStats, assessmentStats } = userData;
+  
+  // Course viewing states
+  const [viewingCourse, setViewingCourse] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
+
+  // Handler for continuing/viewing a course
+  const handleContinueCourse = (course) => {
+    console.log('Continue course:', course);
+    setSelectedCourse(course);
+    
+    // Find the current module based on progress
+    if (course.progress && course.progress.currentModule) {
+      const moduleIndex = course.modules.findIndex(m => m.id === course.progress.currentModule);
+      setCurrentModuleIndex(moduleIndex >= 0 ? moduleIndex : 0);
+    } else {
+      setCurrentModuleIndex(0);
+    }
+    
+    setViewingCourse(true);
+  };
+
+  // Handler for closing course view
+  const handleCloseCourse = () => {
+    setViewingCourse(false);
+    setSelectedCourse(null);
+    setCurrentModuleIndex(0);
+  };
+
+  // Handler for completing a module
+  const handleCompleteModule = async (moduleId) => {
+    try {
+      const updateData = {
+        moduleId: moduleId,
+        completed: true,
+        timeSpent: 300000, // 5 minutes - you can track actual time
+      };
+      
+      await apiService.updateCourseProgress(selectedCourse.id, updateData, token);
+      
+      // Move to next module
+      if (currentModuleIndex < selectedCourse.modules.length - 1) {
+        setCurrentModuleIndex(currentModuleIndex + 1);
+      }
+      
+      showSuccess('Module completed!');
+      refreshData(); // Refresh to update progress
+    } catch (error) {
+      console.error('Failed to update progress:', error);
+      showError('Failed to update progress');
+    }
+  };
+
+  // Course Viewer Component
+  const CourseViewer = ({ course, currentModuleIndex, onClose, onCompleteModule, onNavigateModule }) => {
+    const [showExercises, setShowExercises] = useState(false);
+    const [exerciseAnswers, setExerciseAnswers] = useState({});
+    
+    if (!course || !course.modules || course.modules.length === 0) {
+      return null;
+    }
+
+    const currentModule = course.modules[currentModuleIndex];
+    const isLastModule = currentModuleIndex === course.modules.length - 1;
+    const isFirstModule = currentModuleIndex === 0;
+
+    const handleExerciseAnswer = (exerciseId, answer) => {
+      setExerciseAnswers({
+        ...exerciseAnswers,
+        [exerciseId]: answer
+      });
+    };
+
+    const handleSubmitExercises = () => {
+      let correctCount = 0;
+      currentModule.exercises.forEach(exercise => {
+        if (exerciseAnswers[exercise.id] == exercise.correctAnswer) {
+          correctCount++;
+        }
+      });
+
+      const score = (correctCount / currentModule.exercises.length) * 100;
+      showSuccess(`Module completed! Score: ${score.toFixed(0)}%`);
+      
+      onCompleteModule(currentModule.id);
+      setExerciseAnswers({});
+      setShowExercises(false);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 overflow-hidden">
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="bg-white/10 backdrop-blur-lg border-b border-white/20 p-4">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-white">{course.title}</h1>
+                <p className="text-white/70">Module {currentModuleIndex + 1} of {course.modules.length}: {currentModule.title}</p>
+              </div>
+              <button
+                onClick={onClose}
+                className="text-white/70 hover:text-white transition-colors p-2"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-4xl mx-auto p-8">
+              {!showExercises ? (
+                // Module Content
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
+                  <h2 className="text-3xl font-bold text-white mb-6">{currentModule.title}</h2>
+                  
+                  <div className="prose prose-invert max-w-none">
+                    <div className="text-white/90 whitespace-pre-wrap">
+                      {currentModule.content}
+                    </div>
+                  </div>
+
+                  {currentModule.exercises && currentModule.exercises.length > 0 && (
+                    <div className="mt-8 pt-8 border-t border-white/20">
+                      <button
+                        onClick={() => setShowExercises(true)}
+                        className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all"
+                      >
+                        Start Exercises ({currentModule.exercises.length} questions)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Exercises
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-white mb-6">Module Exercises</h2>
+                  
+                  {currentModule.exercises.map((exercise, index) => (
+                    <div key={exercise.id} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                      <h3 className="text-lg font-semibold text-white mb-4">
+                        Question {index + 1}: {exercise.question}
+                      </h3>
+                      
+                      {exercise.type === 'multiple-choice' && exercise.options && (
+                        <div className="space-y-3">
+                          {exercise.options.map((option, optionIndex) => (
+                            <label key={optionIndex} className="flex items-center space-x-3 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`exercise-${exercise.id}`}
+                                value={optionIndex}
+                                checked={exerciseAnswers[exercise.id] == optionIndex}
+                                onChange={() => handleExerciseAnswer(exercise.id, optionIndex)}
+                                className="w-4 h-4 text-blue-500"
+                              />
+                              <span className="text-white/90">{option}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {exercise.type === 'short-answer' && (
+                        <input
+                          type="text"
+                          value={exerciseAnswers[exercise.id] || ''}
+                          onChange={(e) => handleExerciseAnswer(exercise.id, e.target.value)}
+                          className="w-full p-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50"
+                          placeholder="Your answer..."
+                        />
+                      )}
+                    </div>
+                  ))}
+                  
+                  <div className="flex justify-between mt-8">
+                    <button
+                      onClick={() => setShowExercises(false)}
+                      className="px-6 py-3 bg-white/10 text-white rounded-xl font-medium hover:bg-white/20 transition-all"
+                    >
+                      Back to Content
+                    </button>
+                    <button
+                      onClick={handleSubmitExercises}
+                      disabled={Object.keys(exerciseAnswers).length < currentModule.exercises.length}
+                      className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-medium hover:from-green-600 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Submit Answers
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer Navigation */}
+          <div className="bg-white/10 backdrop-blur-lg border-t border-white/20 p-4">
+            <div className="max-w-4xl mx-auto flex items-center justify-between">
+              <button
+                onClick={() => onNavigateModule(currentModuleIndex - 1)}
+                disabled={isFirstModule}
+                className="px-6 py-3 bg-white/10 text-white rounded-xl font-medium hover:bg-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                <span>Previous Module</span>
+              </button>
+              
+              <div className="flex items-center space-x-2">
+                {course.modules.map((_, index) => (
+                  <div
+                    key={index}
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      index === currentModuleIndex
+                        ? 'bg-blue-400 w-8'
+                        : index < currentModuleIndex
+                        ? 'bg-green-400'
+                        : 'bg-white/30'
+                    }`}
+                  />
+                ))}
+              </div>
+              
+              <button
+                onClick={() => {
+                  if (isLastModule) {
+                    onClose();
+                  } else {
+                    onNavigateModule(currentModuleIndex + 1);
+                  }
+                }}
+                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center space-x-2"
+              >
+                <span>{isLastModule ? 'Complete Course' : 'Next Module'}</span>
+                <ChevronRightIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -122,7 +367,12 @@ const HomeView = ({ user, userData, setCurrentView, loading }) => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {recentCourses.map(course => (
-                <CourseCard key={course.id} course={course} />
+                <CourseCard 
+                  key={course.id} 
+                  course={course} 
+                  onContinue={handleContinueCourse}
+                  showProgress={true}
+                />
               ))}
             </div>
           </div>
@@ -247,6 +497,21 @@ const HomeView = ({ user, userData, setCurrentView, loading }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Course Viewer Modal */}
+      {viewingCourse && selectedCourse && (
+        <CourseViewer
+          course={selectedCourse}
+          currentModuleIndex={currentModuleIndex}
+          onClose={handleCloseCourse}
+          onCompleteModule={handleCompleteModule}
+          onNavigateModule={(index) => {
+            if (index >= 0 && index < selectedCourse.modules.length) {
+              setCurrentModuleIndex(index);
+            }
+          }}
+        />
       )}
     </div>
   );

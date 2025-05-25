@@ -1,13 +1,18 @@
-import { IsNumber, IsArray, ValidateNested, IsOptional } from 'class-validator';
+// src/assessments/dto/submit-assessment.dto.ts
+import { IsNumber, IsArray, ValidateNested, IsOptional, IsString, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class AnswerDto {
+  @IsNumber()
   selectedAnswer: number;
 
   @IsOptional()
+  @IsNumber()
   timeSpent?: number;
 
   @IsOptional()
+  @IsString()
+  @IsIn(['low', 'medium', 'high'])
   confidence?: 'low' | 'medium' | 'high';
 
   @IsOptional()
@@ -24,8 +29,10 @@ export class SubmitAssessmentDto {
   answers: AnswerDto[];
 
   @IsOptional()
+  @IsNumber()
   totalTimeSpent?: number;
 
   @IsOptional()
+  @IsString()
   feedback?: string;
 }

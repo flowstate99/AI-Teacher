@@ -1,3 +1,4 @@
+// src/assessments/assessment.entity.ts
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
 import { User } from '../users/user.entity';
 
@@ -17,25 +18,30 @@ export class Assessment {
     correctAnswer: number;
     topic: string;
     difficulty: string;
+    explanation?: string;
   }[];
 
-  @Column({ type: 'json' })
+  @Column({ type: 'json', nullable: true, default: '[]' })
   answers: {
     questionId: string;
     selectedAnswer: number;
     isCorrect: boolean;
     timeSpent: number;
+    confidence?: string;
+    flagged?: boolean;
   }[];
 
-  @Column({ type: 'json' })
+  @Column({ type: 'json'})
   analysis: {
     overallScore: number;
     topicScores: { [topic: string]: number };
     weakAreas: string[];
     strongAreas: string[];
     recommendations: string[];
-    learningStyle?: 'visual' | 'auditory' | 'kinesthetic' | 'reading';
+    learningStyle?: string;
+    suggestedPace?: string;
     timeSpent?: number;
+    submittedAt?: Date;
   };
 
   @ManyToOne(() => User, user => user.assessments)

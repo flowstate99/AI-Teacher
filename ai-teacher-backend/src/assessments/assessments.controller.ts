@@ -1,3 +1,4 @@
+// src/assessments/assessments.controller.ts
 import {
   Controller,
   Get,
@@ -31,11 +32,51 @@ export class AssessmentsController {
     return this.assessmentsService.generateAssessment(generateDto, userId);
   }
 
+  @Post('debug-submit')
+  debugSubmit(@Body() body: any, @CurrentUser('userId') userId: number) {
+    console.log('=== Debug Submit Endpoint ===');
+    console.log('Raw body:', JSON.stringify(body, null, 2));
+    console.log('User ID:', userId);
+    console.log('Body type:', typeof body);
+    console.log('AssessmentId:', body.assessmentId);
+    console.log('AssessmentId type:', typeof body.assessmentId);
+    console.log('Answers type:', typeof body.answers);
+    console.log('Answers is array:', Array.isArray(body.answers));
+    
+    if (body.answers && Array.isArray(body.answers)) {
+      console.log('Answers length:', body.answers.length);
+      console.log('First answer:', body.answers[0]);
+      if (body.answers[0]) {
+        console.log('First answer selectedAnswer:', body.answers[0].selectedAnswer);
+        console.log('First answer selectedAnswer type:', typeof body.answers[0].selectedAnswer);
+      }
+    }
+    
+    return {
+      message: 'Debug info logged to console',
+      receivedData: {
+        assessmentId: body.assessmentId,
+        assessmentIdType: typeof body.assessmentId,
+        answersLength: body.answers?.length,
+        answersType: typeof body.answers,
+        isArray: Array.isArray(body.answers),
+        firstAnswer: body.answers?.[0],
+      }
+    };
+  }
+
   @Post('submit')
-  submitAssessment(
+  async submitAssessment(
     @Body() submitDto: SubmitAssessmentDto,
     @CurrentUser('userId') userId: number,
   ) {
+    console.log('=== Submit Assessment Controller ===');
+    console.log('Received DTO:', submitDto);
+    console.log('Assessment ID:', submitDto.assessmentId);
+    console.log('Assessment ID type:', typeof submitDto.assessmentId);
+    console.log('Answers array length:', submitDto.answers?.length);
+    console.log('User ID:', userId);
+    
     return this.assessmentsService.submitAssessment(submitDto, userId);
   }
 
@@ -85,13 +126,11 @@ export class AssessmentsController {
     @Body() updateAssessmentDto: UpdateAssessmentDto,
     @CurrentUser('userId') userId: number,
   ) {
-    // Note: This might not be needed for assessments, as they shouldn't be editable after creation
     throw new BadRequestException('Assessments cannot be modified after creation');
   }
 
   @Delete(':id')
   remove(@Param('id') id: string, @CurrentUser('userId') userId: number) {
-    // Note: Consider if assessments should be deletable
     throw new BadRequestException('Assessments cannot be deleted to maintain learning history');
   }
 }

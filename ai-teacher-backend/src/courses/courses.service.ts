@@ -1,21 +1,23 @@
 // src/courses/courses.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not, IsNull } from 'typeorm';
 import { Course } from './course.entity';
-import { User } from '../users/user.entity';
 import { GeminiService } from '../gemini/gemini.service';
 import { UsersService } from '../users/users.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { GeneratePersonalizedCourseDto } from './dto/generate-personalized-course.dto';
 import { UpdateProgressDto } from './dto/update-progress.dto';
+import { Assessment } from '../assessments/assessment.entity';
 
 @Injectable()
 export class CoursesService {
   constructor(
     @InjectRepository(Course)
     private courseRepository: Repository<Course>,
+    @InjectRepository(Assessment)
+    private assessmentRepository: Repository<Assessment>,
     private geminiService: GeminiService,
     private usersService: UsersService,
   ) {}
@@ -69,50 +71,117 @@ export class CoursesService {
     await this.courseRepository.remove(course);
   }
 
-  async generatePersonalizedCourse(
-    generateDto: GeneratePersonalizedCourseDto,
-    userId: number,
-  ): Promise<Course> {
-    const user = await this.usersService.findOne(userId);
-    
-    if (!user.learningProfile) {
-      throw new BadRequestException(
-        'User must complete an assessment first to generate personalized courses'
-      );
-    }
+async generatePersonalizedCourse(
+  generateDto: GeneratePersonalizedCourseDto,
+  userId: number,
+): Promise<Course> {
+  const user = await this.usersService.findOne(userId);
+  
+  // Get subject-specific strengths and weaknesses from assessments
+  const subjectProfile = await this.getSubjectSpecificProfile(userId, generateDto.subject);
+  
+  // Use subject-specific profile if available, otherwise use defaults
+  const strengths = subjectProfile.strengths || [];
+  const weaknesses = subjectProfile.weaknesses || [];
+  const preferredStyle = user.learningProfile?.preferredStyle || 'mixed';
+  const pace = user.learningProfile?.pace || 'normal';
+  
+  console.log(`Generating course for ${generateDto.subject} with profile:`, {
+    strengths,
+    weaknesses,
+    preferredStyle,
+    pace
+  });
+  
+  try {
+    const generatedCourse = await this.geminiService.generatePersonalizedCourse(
+      generateDto.subject,
+      weaknesses,
+      strengths,
+      preferredStyle,
+      generateDto.difficulty || 'intermediate',
+    );
 
-    const { strengths, weaknesses, preferredStyle, pace } = user.learningProfile;
-    
-    try {
-      const generatedCourse = await this.geminiService.generatePersonalizedCourse(
-        generateDto.subject,
-        weaknesses || [],
-        strengths || [],
-        preferredStyle || 'mixed',
-        generateDto.difficulty || 'intermediate',
-      );
+    const course = this.courseRepository.create({
+      title: generatedCourse.title,
+      description: generatedCourse.description,
+      subject: generateDto.subject,
+      difficulty: generateDto.difficulty || 'intermediate',
+      modules: generatedCourse.modules,
+      isPersonalized: true,
+      targetWeaknesses: weaknesses,
+      user,
+      progress: {
+        completedModules: [],
+        currentModule: generatedCourse.modules?.[0]?.id || '',
+        totalProgress: 0,
+      },
+    });
 
-      const course = this.courseRepository.create({
-        title: generatedCourse.title,
-        description: generatedCourse.description,
-        subject: generateDto.subject,
-        difficulty: generateDto.difficulty || 'intermediate',
-        modules: generatedCourse.modules,
-        isPersonalized: true,
-        targetWeaknesses: weaknesses || [],
-        user,
-        progress: {
-          completedModules: [],
-          currentModule: generatedCourse.modules?.[0]?.id || '',
-          totalProgress: 0,
-        },
-      });
-
-      return await this.courseRepository.save(course);
-    } catch (error) {
-      throw new BadRequestException(`Failed to generate personalized course: ${error.message}`);
-    }
+    return await this.courseRepository.save(course);
+  } catch (error) {
+    console.error('Failed to generate personalized course:', error);
+    throw new BadRequestException(`Failed to generate personalized course: ${error.message}`);
   }
+}
+
+// Add this new method to get subject-specific learning profile
+private async getSubjectSpecificProfile(userId: number, subject: string): Promise<{
+  strengths: string[];
+  weaknesses: string[];
+}> {
+  // Get all completed assessments for this user and subject
+  const assessments = await this.assessmentRepository.find({
+    where: {
+      user: { id: userId },
+      subject: subject,
+      analysis: Not(IsNull()), // Only completed assessments
+    },
+    order: {
+      createdAt: 'DESC',
+    },
+    take: 5, // Consider last 5 assessments for this subject
+  });
+
+  if (assessments.length === 0) {
+    return { strengths: [], weaknesses: [] };
+  }
+
+  // Aggregate strengths and weaknesses from these assessments
+  const strengthsMap = new Map<string, number>();
+  const weaknessesMap = new Map<string, number>();
+
+  assessments.forEach(assessment => {
+    const analysis = assessment.analysis;
+    
+    // Count occurrences of each strength
+    if (analysis.strongAreas && Array.isArray(analysis.strongAreas)) {
+      analysis.strongAreas.forEach(area => {
+        strengthsMap.set(area, (strengthsMap.get(area) || 0) + 1);
+      });
+    }
+    
+    // Count occurrences of each weakness
+    if (analysis.weakAreas && Array.isArray(analysis.weakAreas)) {
+      analysis.weakAreas.forEach(area => {
+        weaknessesMap.set(area, (weaknessesMap.get(area) || 0) + 1);
+      });
+    }
+  });
+
+  // Sort by frequency and get top areas
+  const strengths = Array.from(strengthsMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([area]) => area);
+    
+  const weaknesses = Array.from(weaknessesMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([area]) => area);
+
+  return { strengths, weaknesses };
+}
 
   async updateProgress(
     id: number,

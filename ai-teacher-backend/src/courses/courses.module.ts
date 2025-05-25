@@ -5,10 +5,11 @@ import { CoursesController } from './courses.controller';
 import { Course } from './course.entity';
 import { GeminiModule } from '../gemini/gemini.module';
 import { UsersModule } from '../users/users.module';
+import { Assessment } from 'src/assessments/assessment.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Course]),
+    TypeOrmModule.forFeature([Course, Assessment]),
     GeminiModule,
     UsersModule,
   ],

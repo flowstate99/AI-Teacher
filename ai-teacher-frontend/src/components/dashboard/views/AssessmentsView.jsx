@@ -50,33 +50,99 @@ const AssessmentsView = ({ user, token, userData, refreshData, loading, setCurre
     }
   };
 
-  const handleAnswerSelect = (questionIndex, selectedAnswer) => {
-    const newAnswers = [...answers];
-    newAnswers[questionIndex] = {
-      selectedAnswer,
-      timeSpent: 30000, // Mock time spent
-      confidence: 'medium'
-    };
-    setAnswers(newAnswers);
-  };
+// Also replace the handleAnswerSelect function with this:
 
-  const handleSubmitAssessment = async () => {
-    try {
-      const result = await apiService.submitAssessment({
-        assessmentId: parseInt(currentAssessment.assessmentId),
-        answers,
-        totalTimeSpent: currentAssessment.timeLimit - timeLeft
-      }, token);
-      
-      setTaking(false);
-      setCurrentAssessment(null);
-      showSuccess('Assessment submitted successfully!');
-      refreshData();
-    } catch (error) {
-      console.error('Failed to submit assessment:', error);
-      showError(`Failed to submit assessment: ${error.message}`);
-    }
+const handleAnswerSelect = (questionIndex, selectedAnswer) => {
+  console.log('Answer selected:', { questionIndex, selectedAnswer });
+  
+  const newAnswers = [...answers];
+  newAnswers[questionIndex] = {
+    selectedAnswer: parseInt(selectedAnswer),
+    timeSpent: 30000, // Mock time - you could implement real time tracking
+    confidence: 'medium'
   };
+  
+  setAnswers(newAnswers);
+  console.log('Updated answers array:', newAnswers);
+};
+
+const handleSubmitAssessment = async () => {
+  try {
+    console.log('=== Assessment Submission Debug ===');
+    console.log('Current assessment:', currentAssessment);
+    console.log('Raw answers:', answers);
+    
+    // Validate we have an assessment and answers
+    if (!currentAssessment?.assessmentId) {
+      showError('No assessment ID found');
+      return;
+    }
+    
+    if (!answers || answers.length === 0) {
+      showError('Please answer at least one question');
+      return;
+    }
+    
+    // Convert assessment ID to number
+    const assessmentId = parseInt(currentAssessment.assessmentId);
+    console.log('Parsed assessment ID:', assessmentId);
+    
+    if (isNaN(assessmentId) || assessmentId <= 0) {
+      showError('Invalid assessment ID');
+      return;
+    }
+    
+    // Filter out null answers and format properly
+    const validAnswers = answers
+      .map((answer, index) => {
+        if (answer === null || answer === undefined) {
+          return {
+            selectedAnswer: 0, // Default to first option if not answered
+            timeSpent: 30000,
+            confidence: 'medium'
+          };
+        }
+        return {
+          selectedAnswer: parseInt(answer.selectedAnswer) || 0,
+          timeSpent: parseInt(answer.timeSpent) || 30000,
+          confidence: answer.confidence || 'medium'
+        };
+      });
+    
+    console.log('Formatted answers:', validAnswers);
+    
+    // Calculate total time spent
+    const totalTimeSpent = currentAssessment.timeLimit - timeLeft;
+    console.log('Total time spent:', totalTimeSpent);
+    
+    // Create final payload
+    const payload = {
+      assessmentId: assessmentId,
+      answers: validAnswers,
+      totalTimeSpent: Math.max(0, totalTimeSpent) // Ensure non-negative
+    };
+    
+    console.log('Final submission payload:', payload);
+    
+    // Submit assessment
+    const result = await apiService.submitAssessment(payload, token);
+    
+    console.log('Submission successful:', result);
+    
+    // Clean up and show success
+    setTaking(false);
+    setCurrentAssessment(null);
+    setAnswers([]);
+    setCurrentQuestionIndex(0);
+    
+    showSuccess('Assessment submitted successfully!');
+    refreshData();
+    
+  } catch (error) {
+    console.error('Assessment submission failed:', error);
+    showError(`Failed to submit assessment: ${error.message}`);
+  }
+};
 
   const AssessmentTaking = () => {
     const question = currentAssessment.questions[currentQuestionIndex];
@@ -153,6 +219,42 @@ const AssessmentsView = ({ user, token, userData, refreshData, loading, setCurre
             </button>
 
             <div className="flex space-x-3">
+              {/* Debug info */}
+              <div className="text-white/70 text-sm">
+                Answered: {answers.filter(a => a !== null).length}/{currentAssessment.questions.length}
+              </div>
+              
+              {/* Debug button - remove in production */}
+              <button
+                onClick={async () => {
+                  try {
+                    const assessmentId = parseInt(currentAssessment.assessmentId);
+                    const formattedAnswers = answers.map((answer, index) => ({
+                      selectedAnswer: answer?.selectedAnswer || 0,
+                      timeSpent: answer?.timeSpent || 30000,
+                      confidence: answer?.confidence || 'medium'
+                    }));
+                    
+                    const testData = {
+                      assessmentId: assessmentId,
+                      answers: formattedAnswers,
+                      totalTimeSpent: currentAssessment.timeLimit - timeLeft
+                    };
+                    
+                    console.log('Testing with debug endpoint...');
+                    const result = await apiService.debugSubmitAssessment(testData, token);
+                    console.log('Debug result:', result);
+                    showSuccess('Debug test successful! Check console.');
+                  } catch (error) {
+                    console.error('Debug test failed:', error);
+                    showError(`Debug test failed: ${error.message}`);
+                  }
+                }}
+                className="px-3 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700"
+              >
+                Debug
+              </button>
+              
               {isLastQuestion ? (
                 <button
                   onClick={handleSubmitAssessment}

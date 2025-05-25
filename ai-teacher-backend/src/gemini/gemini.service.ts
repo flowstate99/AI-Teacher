@@ -94,46 +94,52 @@ export class GeminiService {
     learningStyle: string,
     difficulty: string = 'intermediate'
   ): Promise<any> {
-    const prompt = `Create a personalized course for ${subject} targeting these specific areas:
-    
-    Student Weaknesses: ${weaknesses.join(', ')}
-    Student Strengths: ${strengths.join(', ')}
-    Learning Style: ${learningStyle}
-    Difficulty Level: ${difficulty}
-    
-    Generate a comprehensive course with 5-7 modules, each focusing on addressing the identified weaknesses while building on strengths.
-    
-    Return JSON in this format:
-    {
-      "title": "Course Title",
-      "description": "Course description",
-      "modules": [
-        {
-          "id": "module_id",
-          "title": "Module Title",
-          "content": "Detailed lesson content with explanations, examples, and concepts",
-          "exercises": [
-            {
-              "id": "exercise_id",
-              "type": "multiple_choice|fill_blank|problem_solving",
-              "question": "Exercise question",
-              "options": ["option1", "option2", "option3", "option4"] (for multiple choice),
-              "correctAnswer": "correct answer",
-              "explanation": "Why this is correct and how it relates to the concept"
-            }
-          ],
-          "estimatedTime": 30
-        }
-      ]
-    }
-    
-    Make the content engaging, interactive, and specifically tailored to address the student's weak areas.`;
+    // Filter or note if weaknesses/strengths are empty
+    const relevantWeaknesses = weaknesses.length > 0 ? weaknesses : ['general concepts'];
+    const relevantStrengths = strengths.length > 0 ? strengths : ['foundational knowledge'];
+  
+    const prompt = `Create a personalized course SPECIFICALLY for ${subject}. 
+  
+  IMPORTANT: This course must focus ONLY on ${subject} topics. Do not include content from other subjects.
+  
+  ${weaknesses.length > 0 ? `Student Weaknesses in ${subject}: ${relevantWeaknesses.join(', ')}` : `This is a general ${subject} course as no specific weaknesses were identified.`}
+  ${strengths.length > 0 ? `Student Strengths in ${subject}: ${relevantStrengths.join(', ')}` : ''}
+  Learning Style: ${learningStyle}
+  Difficulty Level: ${difficulty}
+  
+  Generate a comprehensive ${subject} course with 5-7 modules. ${weaknesses.length > 0 ? 'Each module should focus on addressing the identified weaknesses within ' + subject + ' only.' : 'Cover fundamental ' + subject + ' concepts progressively.'}
+  
+  Return JSON in this format:
+  {
+    "title": "Course Title for ${subject}",
+    "description": "Course description focusing on ${subject}",
+    "modules": [
+      {
+        "id": "module_id",
+        "title": "Module Title (must be ${subject}-related)",
+        "content": "Detailed lesson content with ${subject}-specific explanations, examples, and concepts. Do NOT include examples from other subjects.",
+        "exercises": [
+          {
+            "id": "exercise_id",
+            "type": "multiple-choice",
+            "question": "Exercise question about ${subject}",
+            "options": ["option1", "option2", "option3", "option4"],
+            "correctAnswer": 0,
+            "explanation": "Explanation related to ${subject} concepts"
+          }
+        ],
+        "estimatedTime": 30
+      }
+    ]
+  }
+  
+  All content, examples, and exercises MUST be specifically about ${subject}. Do not mix in content from other subjects.`;
 
     try {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-      
+    
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
