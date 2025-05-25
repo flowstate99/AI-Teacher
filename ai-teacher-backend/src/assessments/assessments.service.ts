@@ -43,7 +43,7 @@ export class AssessmentsService {
         questions: generatedData.questions,
         user: { id: userId },
         answers: [], // Empty array initially
-        // Don't set analysis - let it default to null/undefined
+        analysis: {}
       });
 
       const savedAssessment = await this.assessmentRepository.save(assessment);
