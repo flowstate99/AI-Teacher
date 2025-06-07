@@ -1,10 +1,10 @@
 // src/components/dashboard/views/HomeView.jsx
 import React, { useState } from 'react';
-import { 
-  BookOpen, 
-  Trophy, 
-  Target, 
-  Zap, 
+import {
+  BookOpen,
+  Trophy,
+  Target,
+  Zap,
   ChevronRight,
   Plus,
   Play,
@@ -20,10 +20,11 @@ import StatCard from '../components/StatCard';
 import CourseCard from '../components/CourseCard';
 import QuickActionCard from '../components/QuickActionCard';
 import apiService from '../../../services/api';
+import LatexRenderer, {MixedContent} from '../../ui/LatexRenderer';
 
 const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData, showError, showSuccess }) => {
   const { courses, userStats, assessmentStats } = userData;
-  
+
   // Course viewing states
   const [viewingCourse, setViewingCourse] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -33,7 +34,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
   const handleContinueCourse = (course) => {
     console.log('Continue course:', course);
     setSelectedCourse(course);
-    
+
     // Find the current module based on progress
     if (course.progress && course.progress.currentModule) {
       const moduleIndex = course.modules.findIndex(m => m.id === course.progress.currentModule);
@@ -41,7 +42,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
     } else {
       setCurrentModuleIndex(0);
     }
-    
+
     setViewingCourse(true);
   };
 
@@ -60,14 +61,14 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
         completed: true,
         timeSpent: 300000, // 5 minutes - you can track actual time
       };
-      
+
       await apiService.updateCourseProgress(selectedCourse.id, updateData, token);
-      
+
       // Move to next module
       if (currentModuleIndex < selectedCourse.modules.length - 1) {
         setCurrentModuleIndex(currentModuleIndex + 1);
       }
-      
+
       showSuccess('Module completed!');
       refreshData(); // Refresh to update progress
     } catch (error) {
@@ -80,7 +81,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
   const CourseViewer = ({ course, currentModuleIndex, onClose, onCompleteModule, onNavigateModule }) => {
     const [showExercises, setShowExercises] = useState(false);
     const [exerciseAnswers, setExerciseAnswers] = useState({});
-    
+
     if (!course || !course.modules || course.modules.length === 0) {
       return null;
     }
@@ -106,7 +107,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
 
       const score = (correctCount / currentModule.exercises.length) * 100;
       showSuccess(`Module completed! Score: ${score.toFixed(0)}%`);
-      
+
       onCompleteModule(currentModule.id);
       setExerciseAnswers({});
       setShowExercises(false);
@@ -138,11 +139,11 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
                 // Module Content
                 <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
                   <h2 className="text-3xl font-bold text-white mb-6">{currentModule.title}</h2>
-                  
+
                   <div className="prose prose-invert max-w-none">
-                    <div className="text-white/90 whitespace-pre-wrap">
+                    <MixedContent className="text-white/90">
                       {currentModule.content}
-                    </div>
+                    </MixedContent>
                   </div>
 
                   {currentModule.exercises && currentModule.exercises.length > 0 && (
@@ -160,13 +161,13 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
                 // Exercises
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">Module Exercises</h2>
-                  
+
                   {currentModule.exercises.map((exercise, index) => (
                     <div key={exercise.id} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-                      <h3 className="text-lg font-semibold text-white mb-4">
-                        Question {index + 1}: {exercise.question}
-                      </h3>
-                      
+                      <div className="text-lg font-semibold text-white mb-4">
+                        Question {index + 1}: <LatexRenderer inline>{exercise.question}</LatexRenderer>
+                      </div>
+
                       {exercise.type === 'multiple-choice' && exercise.options && (
                         <div className="space-y-3">
                           {exercise.options.map((option, optionIndex) => (
@@ -179,12 +180,12 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
                                 onChange={() => handleExerciseAnswer(exercise.id, optionIndex)}
                                 className="w-4 h-4 text-blue-500"
                               />
-                              <span className="text-white/90">{option}</span>
+                              <span className="text-white/90"><LatexRenderer inline>{option}</LatexRenderer></span>
                             </label>
                           ))}
                         </div>
                       )}
-                      
+
                       {exercise.type === 'short-answer' && (
                         <input
                           type="text"
@@ -196,7 +197,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
                       )}
                     </div>
                   ))}
-                  
+
                   <div className="flex justify-between mt-8">
                     <button
                       onClick={() => setShowExercises(false)}
@@ -228,22 +229,21 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
                 <ChevronLeft className="w-5 h-5" />
                 <span>Previous Module</span>
               </button>
-              
+
               <div className="flex items-center space-x-2">
                 {course.modules.map((_, index) => (
                   <div
                     key={index}
-                    className={`w-2 h-2 rounded-full transition-all ${
-                      index === currentModuleIndex
-                        ? 'bg-blue-400 w-8'
-                        : index < currentModuleIndex
+                    className={`w-2 h-2 rounded-full transition-all ${index === currentModuleIndex
+                      ? 'bg-blue-400 w-8'
+                      : index < currentModuleIndex
                         ? 'bg-green-400'
                         : 'bg-white/30'
-                    }`}
+                      }`}
                   />
                 ))}
               </div>
-              
+
               <button
                 onClick={() => {
                   if (isLastModule) {
@@ -280,7 +280,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
       {/* Welcome Section */}
       <div className="text-center py-8">
         <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-          Welcome back, 
+          Welcome back,
           <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent ml-3">
             {user.firstName}
           </span>!
@@ -329,7 +329,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
             </div>
             <h3 className="text-2xl font-bold text-white mb-4">Start Your Learning Journey</h3>
             <p className="text-white/70 mb-8 max-w-2xl mx-auto">
-              Take a quick assessment to discover your strengths and weaknesses, then get personalized 
+              Take a quick assessment to discover your strengths and weaknesses, then get personalized
               courses tailored just for you.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -364,12 +364,12 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {recentCourses.map(course => (
-                <CourseCard 
-                  key={course.id} 
-                  course={course} 
+                <CourseCard
+                  key={course.id}
+                  course={course}
                   onContinue={handleContinueCourse}
                   showProgress={true}
                 />
@@ -385,11 +385,10 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {assessmentStats.recentPerformance.slice(0, 3).map((assessment, index) => (
                     <div key={assessment.id} className="text-center">
-                      <div className={`w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center ${
-                        assessment.score >= 80 ? 'bg-green-500/20 text-green-400' :
+                      <div className={`w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center ${assessment.score >= 80 ? 'bg-green-500/20 text-green-400' :
                         assessment.score >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-red-500/20 text-red-400'
-                      }`}>
+                          'bg-red-500/20 text-red-400'
+                        }`}>
                         <span className="text-xl font-bold">{assessment.score}%</span>
                       </div>
                       <h3 className="text-white font-semibold">{assessment.subject}</h3>
@@ -416,7 +415,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
           action={() => setCurrentView('assessments')}
           buttonText="Start Assessment"
         />
-        
+
         <QuickActionCard
           title="Generate Course"
           description="Create AI-powered courses tailored to your learning style"
@@ -447,7 +446,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
                 {userStats.completedCourses > 0 ? 'Excellent' : 'Getting Started'}
               </div>
               <p className="text-white/70 text-sm">
-                {userStats.completedCourses > 0 
+                {userStats.completedCourses > 0
                   ? 'You\'re making great progress!'
                   : 'Complete your first course to see insights'
                 }
@@ -468,7 +467,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
                 {assessmentStats.strongestSubjects?.[0] || 'Not determined'}
               </div>
               <p className="text-white/70 text-sm">
-                {assessmentStats.strongestSubjects?.[0] 
+                {assessmentStats.strongestSubjects?.[0]
                   ? 'Keep building on this strength!'
                   : 'Take assessments to identify strengths'
                 }
@@ -489,7 +488,7 @@ const HomeView = ({ user, userData, setCurrentView, loading, token, refreshData,
                 {userStats.learningStreak > 0 ? `${userStats.learningStreak * 30}min` : '0min'}
               </div>
               <p className="text-white/70 text-sm">
-                {userStats.learningStreak > 0 
+                {userStats.learningStreak > 0
                   ? 'Great consistency!'
                   : 'Start learning to track time'
                 }

@@ -1,11 +1,11 @@
 // src/components/dashboard/views/CoursesView.jsx
 import React, { useState } from 'react';
-import { 
-  BookOpen, 
-  Plus, 
-  Search, 
-  Filter, 
-  Grid3X3, 
+import {
+  BookOpen,
+  Plus,
+  Search,
+  Filter,
+  Grid3X3,
   List,
   Star,
   Clock,
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import CourseCard from '../components/CourseCard';
 import apiService from '../../../services/api';
+import LatexRenderer, { MixedContent } from '../../ui/LatexRenderer';
 
 const CoursesView = ({ user, token, userData, refreshData, loading, showError, showSuccess }) => {
   const [viewMode, setViewMode] = useState('grid');
@@ -26,7 +27,7 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
   const [filterDifficulty, setFilterDifficulty] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [generating, setGenerating] = useState(false);
-  
+
   // Course viewing states
   const [viewingCourse, setViewingCourse] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -39,10 +40,10 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
 
   const filteredCourses = courses?.filter(course => {
     const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         course.subject.toLowerCase().includes(searchQuery.toLowerCase());
+      course.subject.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSubject = filterSubject === 'all' || course.subject === filterSubject;
     const matchesDifficulty = filterDifficulty === 'all' || course.difficulty === filterDifficulty;
-    
+
     return matchesSearch && matchesSubject && matchesDifficulty;
   }) || [];
 
@@ -50,7 +51,7 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
   const handleContinueCourse = (course) => {
     console.log('Continue course:', course);
     setSelectedCourse(course);
-    
+
     // Find the current module based on progress
     if (course.progress && course.progress.currentModule) {
       const moduleIndex = course.modules.findIndex(m => m.id === course.progress.currentModule);
@@ -58,7 +59,7 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
     } else {
       setCurrentModuleIndex(0);
     }
-    
+
     setViewingCourse(true);
   };
 
@@ -77,14 +78,14 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
         completed: true,
         timeSpent: 300000, // 5 minutes - you can track actual time
       };
-      
+
       await apiService.updateCourseProgress(selectedCourse.id, updateData, token);
-      
+
       // Move to next module
       if (currentModuleIndex < selectedCourse.modules.length - 1) {
         setCurrentModuleIndex(currentModuleIndex + 1);
       }
-      
+
       showSuccess('Module completed!');
       refreshData(); // Refresh to update progress
     } catch (error) {
@@ -102,18 +103,18 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
     setGenerating(true);
     try {
       const result = await apiService.generatePersonalizedCourse(
-        subject.trim(), 
+        subject.trim(),
         token,
         {
           difficulty: 'intermediate',
         }
       );
-      
+
       console.log('Course generated successfully:', result);
       showSuccess(`${subject} course created successfully!`);
       refreshData();
       setShowCreateModal(false);
-      
+
     } catch (error) {
       console.error('Failed to generate course:', error);
       showError(`Failed to generate course: ${error.message}`);
@@ -126,7 +127,7 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
   const CourseViewer = ({ course, currentModuleIndex, onClose, onCompleteModule, onNavigateModule }) => {
     const [showExercises, setShowExercises] = useState(false);
     const [exerciseAnswers, setExerciseAnswers] = useState({});
-    
+
     if (!course || !course.modules || course.modules.length === 0) {
       return null;
     }
@@ -152,7 +153,7 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
 
       const score = (correctCount / currentModule.exercises.length) * 100;
       showSuccess(`Module completed! Score: ${score.toFixed(0)}%`);
-      
+
       onCompleteModule(currentModule.id);
       setExerciseAnswers({});
       setShowExercises(false);
@@ -184,11 +185,11 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
                 // Module Content
                 <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
                   <h2 className="text-3xl font-bold text-white mb-6">{currentModule.title}</h2>
-                  
+
                   <div className="prose prose-invert max-w-none">
-                    <div className="text-white/90 whitespace-pre-wrap">
+                    <MixedContent className="text-white/90">
                       {currentModule.content}
-                    </div>
+                    </MixedContent>
                   </div>
 
                   {currentModule.exercises && currentModule.exercises.length > 0 && (
@@ -206,13 +207,13 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
                 // Exercises
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-white mb-6">Module Exercises</h2>
-                  
+
                   {currentModule.exercises.map((exercise, index) => (
                     <div key={exercise.id} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
                       <h3 className="text-lg font-semibold text-white mb-4">
-                        Question {index + 1}: {exercise.question}
+                        Question {index + 1}: <LatexRenderer inline>{exercise.question}</LatexRenderer>
                       </h3>
-                      
+
                       {exercise.type === 'multiple-choice' && exercise.options && (
                         <div className="space-y-3">
                           {exercise.options.map((option, optionIndex) => (
@@ -225,12 +226,12 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
                                 onChange={() => handleExerciseAnswer(exercise.id, optionIndex)}
                                 className="w-4 h-4 text-blue-500"
                               />
-                              <span className="text-white/90">{option}</span>
+                              <span className="text-white/90"><LatexRenderer inline>{option}</LatexRenderer></span>
                             </label>
                           ))}
                         </div>
                       )}
-                      
+
                       {exercise.type === 'short-answer' && (
                         <input
                           type="text"
@@ -242,7 +243,7 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
                       )}
                     </div>
                   ))}
-                  
+
                   <div className="flex justify-between mt-8">
                     <button
                       onClick={() => setShowExercises(false)}
@@ -274,22 +275,21 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
                 <ChevronLeft className="w-5 h-5" />
                 <span>Previous Module</span>
               </button>
-              
+
               <div className="flex items-center space-x-2">
                 {course.modules.map((_, index) => (
                   <div
                     key={index}
-                    className={`w-2 h-2 rounded-full transition-all ${
-                      index === currentModuleIndex
-                        ? 'bg-blue-400 w-8'
-                        : index < currentModuleIndex
+                    className={`w-2 h-2 rounded-full transition-all ${index === currentModuleIndex
+                      ? 'bg-blue-400 w-8'
+                      : index < currentModuleIndex
                         ? 'bg-green-400'
                         : 'bg-white/30'
-                    }`}
+                      }`}
                   />
                 ))}
               </div>
-              
+
               <button
                 onClick={() => {
                   if (isLastModule) {
@@ -363,7 +363,7 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
             {courses?.length || 0} courses • {courses?.filter(c => c.progress?.totalProgress === 100).length || 0} completed
           </p>
         </div>
-        
+
         <button
           onClick={() => setShowCreateModal(true)}
           className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center space-x-2"
@@ -419,17 +419,15 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
           <div className="flex bg-white/10 rounded-xl p-1 border border-white/20">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg transition-all ${
-                viewMode === 'grid' ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white'
-              }`}
+              className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white'
+                }`}
             >
               <Grid3X3 className="w-5 h-5" />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg transition-all ${
-                viewMode === 'list' ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white'
-              }`}
+              className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white'
+                }`}
             >
               <List className="w-5 h-5" />
             </button>
@@ -452,7 +450,7 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
             {courses?.length === 0 ? 'No courses yet' : 'No courses found'}
           </h3>
           <p className="text-white/70 mb-6">
-            {courses?.length === 0 
+            {courses?.length === 0
               ? 'Generate your first AI-powered course to get started'
               : 'Try adjusting your search or filters'
             }
@@ -468,15 +466,15 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
         </div>
       ) : (
         <div className={
-          viewMode === 'grid' 
+          viewMode === 'grid'
             ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
             : 'space-y-4'
         }>
           {filteredCourses.map(course => (
             viewMode === 'grid' ? (
-              <CourseCard 
-                key={course.id} 
-                course={course} 
+              <CourseCard
+                key={course.id}
+                course={course}
                 onContinue={handleContinueCourse}
                 showProgress={true}
               />
@@ -492,7 +490,7 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
                       <p className="text-white/70">{course.subject} • {course.difficulty}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center space-x-6">
                     <div className="text-center">
                       <div className="text-white font-semibold">{course.modules?.length || 0}</div>
@@ -502,7 +500,7 @@ const CoursesView = ({ user, token, userData, refreshData, loading, showError, s
                       <div className="text-white font-semibold">{course.progress?.totalProgress || 0}%</div>
                       <div className="text-white/70 text-sm">Complete</div>
                     </div>
-                    <button 
+                    <button
                       onClick={() => handleContinueCourse(course)}
                       className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all"
                     >

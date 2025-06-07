@@ -1,10 +1,10 @@
 // src/components/dashboard/views/AssessmentsView.jsx
 import React, { useState } from 'react';
-import { 
-  Target, 
-  Plus, 
-  Clock, 
-  CheckCircle, 
+import {
+  Target,
+  Plus,
+  Clock,
+  CheckCircle,
   TrendingUp,
   Award,
   BarChart3,
@@ -13,6 +13,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import apiService from '../../../services/api';
+import { LaTeXStyles } from '../../ui/LatexRenderer';
 
 const AssessmentsView = ({ user, token, userData, refreshData, loading, setCurrentView, showError, showSuccess }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -50,99 +51,99 @@ const AssessmentsView = ({ user, token, userData, refreshData, loading, setCurre
     }
   };
 
-// Also replace the handleAnswerSelect function with this:
+  // Also replace the handleAnswerSelect function with this:
 
-const handleAnswerSelect = (questionIndex, selectedAnswer) => {
-  console.log('Answer selected:', { questionIndex, selectedAnswer });
-  
-  const newAnswers = [...answers];
-  newAnswers[questionIndex] = {
-    selectedAnswer: parseInt(selectedAnswer),
-    timeSpent: 30000, // Mock time - you could implement real time tracking
-    confidence: 'medium'
-  };
-  
-  setAnswers(newAnswers);
-  console.log('Updated answers array:', newAnswers);
-};
+  const handleAnswerSelect = (questionIndex, selectedAnswer) => {
+    console.log('Answer selected:', { questionIndex, selectedAnswer });
 
-const handleSubmitAssessment = async () => {
-  try {
-    console.log('=== Assessment Submission Debug ===');
-    console.log('Current assessment:', currentAssessment);
-    console.log('Raw answers:', answers);
-    
-    // Validate we have an assessment and answers
-    if (!currentAssessment?.assessmentId) {
-      showError('No assessment ID found');
-      return;
-    }
-    
-    if (!answers || answers.length === 0) {
-      showError('Please answer at least one question');
-      return;
-    }
-    
-    // Convert assessment ID to number
-    const assessmentId = parseInt(currentAssessment.assessmentId);
-    console.log('Parsed assessment ID:', assessmentId);
-    
-    if (isNaN(assessmentId) || assessmentId <= 0) {
-      showError('Invalid assessment ID');
-      return;
-    }
-    
-    // Filter out null answers and format properly
-    const validAnswers = answers
-      .map((answer, index) => {
-        if (answer === null || answer === undefined) {
-          return {
-            selectedAnswer: 0, // Default to first option if not answered
-            timeSpent: 30000,
-            confidence: 'medium'
-          };
-        }
-        return {
-          selectedAnswer: parseInt(answer.selectedAnswer) || 0,
-          timeSpent: parseInt(answer.timeSpent) || 30000,
-          confidence: answer.confidence || 'medium'
-        };
-      });
-    
-    console.log('Formatted answers:', validAnswers);
-    
-    // Calculate total time spent
-    const totalTimeSpent = currentAssessment.timeLimit - timeLeft;
-    console.log('Total time spent:', totalTimeSpent);
-    
-    // Create final payload
-    const payload = {
-      assessmentId: assessmentId,
-      answers: validAnswers,
-      totalTimeSpent: Math.max(0, totalTimeSpent) // Ensure non-negative
+    const newAnswers = [...answers];
+    newAnswers[questionIndex] = {
+      selectedAnswer: parseInt(selectedAnswer),
+      timeSpent: 30000, // Mock time - you could implement real time tracking
+      confidence: 'medium'
     };
-    
-    console.log('Final submission payload:', payload);
-    
-    // Submit assessment
-    const result = await apiService.submitAssessment(payload, token);
-    
-    console.log('Submission successful:', result);
-    
-    // Clean up and show success
-    setTaking(false);
-    setCurrentAssessment(null);
-    setAnswers([]);
-    setCurrentQuestionIndex(0);
-    
-    showSuccess('Assessment submitted successfully!');
-    refreshData();
-    
-  } catch (error) {
-    console.error('Assessment submission failed:', error);
-    showError(`Failed to submit assessment: ${error.message}`);
-  }
-};
+
+    setAnswers(newAnswers);
+    console.log('Updated answers array:', newAnswers);
+  };
+
+  const handleSubmitAssessment = async () => {
+    try {
+      console.log('=== Assessment Submission Debug ===');
+      console.log('Current assessment:', currentAssessment);
+      console.log('Raw answers:', answers);
+
+      // Validate we have an assessment and answers
+      if (!currentAssessment?.assessmentId) {
+        showError('No assessment ID found');
+        return;
+      }
+
+      if (!answers || answers.length === 0) {
+        showError('Please answer at least one question');
+        return;
+      }
+
+      // Convert assessment ID to number
+      const assessmentId = parseInt(currentAssessment.assessmentId);
+      console.log('Parsed assessment ID:', assessmentId);
+
+      if (isNaN(assessmentId) || assessmentId <= 0) {
+        showError('Invalid assessment ID');
+        return;
+      }
+
+      // Filter out null answers and format properly
+      const validAnswers = answers
+        .map((answer, index) => {
+          if (answer === null || answer === undefined) {
+            return {
+              selectedAnswer: 0, // Default to first option if not answered
+              timeSpent: 30000,
+              confidence: 'medium'
+            };
+          }
+          return {
+            selectedAnswer: parseInt(answer.selectedAnswer) || 0,
+            timeSpent: parseInt(answer.timeSpent) || 30000,
+            confidence: answer.confidence || 'medium'
+          };
+        });
+
+      console.log('Formatted answers:', validAnswers);
+
+      // Calculate total time spent
+      const totalTimeSpent = currentAssessment.timeLimit - timeLeft;
+      console.log('Total time spent:', totalTimeSpent);
+
+      // Create final payload
+      const payload = {
+        assessmentId: assessmentId,
+        answers: validAnswers,
+        totalTimeSpent: Math.max(0, totalTimeSpent) // Ensure non-negative
+      };
+
+      console.log('Final submission payload:', payload);
+
+      // Submit assessment
+      const result = await apiService.submitAssessment(payload, token);
+
+      console.log('Submission successful:', result);
+
+      // Clean up and show success
+      setTaking(false);
+      setCurrentAssessment(null);
+      setAnswers([]);
+      setCurrentQuestionIndex(0);
+
+      showSuccess('Assessment submitted successfully!');
+      refreshData();
+
+    } catch (error) {
+      console.error('Assessment submission failed:', error);
+      showError(`Failed to submit assessment: ${error.message}`);
+    }
+  };
 
   const AssessmentTaking = () => {
     const question = currentAssessment.questions[currentQuestionIndex];
@@ -170,7 +171,7 @@ const handleSubmitAssessment = async () => {
 
           {/* Progress Bar */}
           <div className="w-full bg-white/20 rounded-full h-2 mb-8">
-            <div 
+            <div
               className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${((currentQuestionIndex + 1) / currentAssessment.questions.length) * 100}%` }}
             ></div>
@@ -178,30 +179,30 @@ const handleSubmitAssessment = async () => {
 
           {/* Question */}
           <div className="mb-8">
-            <h3 className="text-xl font-semibold text-white mb-6">{question.question}</h3>
-            
+            <div className="text-xl font-semibold text-white mb-6">
+              <MixedContent>{question.question}</MixedContent>
+            </div>
+
             <div className="space-y-3">
               {question.options.map((option, index) => (
                 <button
                   key={index}
                   onClick={() => handleAnswerSelect(currentQuestionIndex, index)}
-                  className={`w-full p-4 rounded-xl text-left transition-all border ${
-                    answers[currentQuestionIndex]?.selectedAnswer === index
-                      ? 'bg-blue-500/20 border-blue-400 text-white'
-                      : 'bg-white/10 border-white/20 text-white/90 hover:bg-white/20 hover:border-white/30'
-                  }`}
+                  className={`w-full p-4 rounded-xl text-left transition-all border ${answers[currentQuestionIndex]?.selectedAnswer === index
+                    ? 'bg-blue-500/20 border-blue-400 text-white'
+                    : 'bg-white/10 border-white/20 text-white/90 hover:bg-white/20 hover:border-white/30'
+                    }`}
                 >
                   <div className="flex items-center space-x-3">
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      answers[currentQuestionIndex]?.selectedAnswer === index
-                        ? 'border-blue-400 bg-blue-500'
-                        : 'border-white/40'
-                    }`}>
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${answers[currentQuestionIndex]?.selectedAnswer === index
+                      ? 'border-blue-400 bg-blue-500'
+                      : 'border-white/40'
+                      }`}>
                       {answers[currentQuestionIndex]?.selectedAnswer === index && (
                         <div className="w-2 h-2 bg-white rounded-full"></div>
                       )}
                     </div>
-                    <span>{option}</span>
+                    <span><LatexRenderer inline>{option}</LatexRenderer></span>
                   </div>
                 </button>
               ))}
@@ -223,7 +224,7 @@ const handleSubmitAssessment = async () => {
               <div className="text-white/70 text-sm">
                 Answered: {answers.filter(a => a !== null).length}/{currentAssessment.questions.length}
               </div>
-              
+
               {/* Debug button - remove in production */}
               <button
                 onClick={async () => {
@@ -234,13 +235,13 @@ const handleSubmitAssessment = async () => {
                       timeSpent: answer?.timeSpent || 30000,
                       confidence: answer?.confidence || 'medium'
                     }));
-                    
+
                     const testData = {
                       assessmentId: assessmentId,
                       answers: formattedAnswers,
                       totalTimeSpent: currentAssessment.timeLimit - timeLeft
                     };
-                    
+
                     console.log('Testing with debug endpoint...');
                     const result = await apiService.debugSubmitAssessment(testData, token);
                     console.log('Debug result:', result);
@@ -254,7 +255,7 @@ const handleSubmitAssessment = async () => {
               >
                 Debug
               </button>
-              
+
               {isLastQuestion ? (
                 <button
                   onClick={handleSubmitAssessment}
@@ -337,7 +338,7 @@ const handleSubmitAssessment = async () => {
             Track your progress and identify areas for improvement
           </p>
         </div>
-        
+
         <div className="flex gap-2">
           {/* Debug button - remove in production */}
           <button
@@ -356,7 +357,7 @@ const handleSubmitAssessment = async () => {
           >
             Debug Test
           </button>
-          
+
           <button
             onClick={() => setShowCreateModal(true)}
             className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center space-x-2"
@@ -431,17 +432,15 @@ const handleSubmitAssessment = async () => {
               <div key={assessment.id} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/20 transition-all">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      assessment.analysis?.overallScore >= 80 ? 'bg-green-500/20' :
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${assessment.analysis?.overallScore >= 80 ? 'bg-green-500/20' :
                       assessment.analysis?.overallScore >= 60 ? 'bg-yellow-500/20' :
-                      'bg-red-500/20'
-                    }`}>
+                        'bg-red-500/20'
+                      }`}>
                       {assessment.analysis ? (
-                        <CheckCircle className={`w-6 h-6 ${
-                          assessment.analysis.overallScore >= 80 ? 'text-green-400' :
+                        <CheckCircle className={`w-6 h-6 ${assessment.analysis.overallScore >= 80 ? 'text-green-400' :
                           assessment.analysis.overallScore >= 60 ? 'text-yellow-400' :
-                          'text-red-400'
-                        }`} />
+                            'text-red-400'
+                          }`} />
                       ) : (
                         <Clock className="w-6 h-6 text-orange-400" />
                       )}
@@ -453,7 +452,7 @@ const handleSubmitAssessment = async () => {
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center space-x-6">
                     {assessment.analysis && (
                       <div className="text-center">
@@ -475,7 +474,7 @@ const handleSubmitAssessment = async () => {
                     </div>
                   </div>
                 </div>
-                
+
                 {assessment.analysis && (
                   <div className="mt-4 pt-4 border-t border-white/20">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
